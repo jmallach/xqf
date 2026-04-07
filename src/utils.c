@@ -137,7 +137,7 @@ int str_isempty (const char *str) {
 
 char *expand_tilde (const char *path) {
 	char *res = NULL;
-	char *slash;
+	const char *slash;
 	char name[MAXNAMELEN];
 	int namelen;
 	struct passwd *pwd;
@@ -796,7 +796,7 @@ char* resolve_path(const char* path) {
 	struct stat statbuf;
 	int length = 0;
 	char buf[256];
-	char *ptr = NULL;
+	const char *ptr = NULL;
 	char *dir = NULL;
 	char* tmp = NULL;
 

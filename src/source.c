@@ -250,7 +250,7 @@ static struct master *find_master_server (char *addr, unsigned short port, char 
 
 static char *unify_url (const char *url) {
 	char *unified, *tmp;
-	char *ptr, *ptr2, *ptr3;
+	const char *ptr, *ptr2, *ptr3;
 	long port;
 	int len;
 
@@ -276,7 +276,7 @@ static char *unify_url (const char *url) {
 		ptr3 = ptr2;
 	}
 	else {
-		port = strtol (ptr2 + 1, &ptr3, 10);
+		port = strtol (ptr2 + 1, (char **)&ptr3, 10);
 		if (port != 80)
 			ptr2 = ptr3;
 	}

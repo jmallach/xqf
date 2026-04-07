@@ -117,7 +117,7 @@ static void rcon_print (char *fmt, ...) {
 		g_vsnprintf (buf, sizeof(buf), fmt, ap);
 		va_end (ap);
 
-		gtk_text_buffer_set_text(rcon_text_buffer, buf, strlen(buf));
+		gtk_text_buffer_insert_at_cursor(rcon_text_buffer, buf, strlen(buf));
 
 		vadjustment = gtk_text_view_get_vadjustment (GTK_TEXT_VIEW (rcon_text));
 		gtk_adjustment_set_value (vadjustment,
@@ -218,7 +218,7 @@ static int rcon_send(const char* cmd) {
 			return -1;
 		}
 
-		rcon_challenge = g_strstrip(msg+strlen(mustresponse));
+		rcon_challenge = g_strdup(g_strstrip(msg+strlen(mustresponse)));
 	}
 
 	if (rcon_servertype == HL_SERVER) {
@@ -437,16 +437,18 @@ static char* rcon_receive() {
 static gboolean rcon_input_callback (GIOChannel *chan, GIOCondition condition,
                                      void *user_data) {
 	GtkAdjustment *vadjustment;
-	char* msg = rcon_receive();
+	char* msg;
 
-	gtk_text_buffer_set_text (rcon_text_buffer, msg, strlen(msg));
+	while (wait_read_timeout(rcon_fd, 0, 50000) > 0) {
+		msg = rcon_receive();
+		gtk_text_buffer_insert_at_cursor (rcon_text_buffer, msg, strlen(msg));
+		g_free(msg);
+	}
 
 	vadjustment = gtk_text_view_get_vadjustment (GTK_TEXT_VIEW (rcon_text));
 	gtk_adjustment_set_value (vadjustment,
 			gtk_adjustment_get_upper (vadjustment) -
 			gtk_adjustment_get_page_size (vadjustment));
-
-	g_free(msg);
 
 	return TRUE;
 }
@@ -523,7 +525,7 @@ void rcon_dialog (const struct server *s, const char *passwd) {
 	if (rcon_challenge)
 		g_free(rcon_challenge);
 	rcon_challenge = NULL;
-	rcon_password = passwd;
+	rcon_password = g_strdup(passwd);
 	rcon_servertype = s->type;
 	rcon_fd = open_connection (&s->host->ip, s->port);
 	if (rcon_fd < 0)

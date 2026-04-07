@@ -350,13 +350,14 @@ static char *path_concat (const char *str1, const char *str2) {
 
 static struct config_key *parse_path (const char *path,
 		int create,
-		char **defval,
+		const char **defval,
 		struct config_file **file1,
 		struct config_section **section1) {
 	const char *filename;
 	char *secname = NULL;
 	char *keyname = NULL;
-	char *def;
+	const char *def;
+	char *def2;
 	char *buf = NULL;
 	char *ptr = NULL;
 	struct config_file *file;
@@ -384,9 +385,9 @@ static struct config_key *parse_path (const char *path,
 		buf = g_strdup (path);
 	}
 
-	def = strchr (buf, '=');
-	if (def)
-		*def = '\0';
+	def2 = strchr (buf, '=');
+	if (def2)
+		*def2 = '\0';
 
 	filename = ptr = &buf[1];
 
@@ -526,7 +527,7 @@ static char *string_unescape (const char *s) {
 static char *config_get_raw_with_default (const char *path, int *def) {
 	struct config_file *file;
 	struct config_key *key;
-	char *val;
+	const char *val;
 
 	key = parse_path (path, FALSE, &val, &file, NULL);
 	if (key) {
@@ -536,7 +537,7 @@ static char *config_get_raw_with_default (const char *path, int *def) {
 	else {
 		if (def) *def = TRUE;
 	}
-	return val;
+	return (char *)val;
 }
 
 

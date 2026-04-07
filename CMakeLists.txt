@@ -624,7 +624,10 @@ if (BUILD_XQF)
 
 	find_package(Gettext REQUIRED)
 
-	pkg_check_modules(UNZIP REQUIRED minizip)
+	pkg_check_modules(UNZIP minizip-ng)
+if(NOT UNZIP_FOUND)
+  pkg_check_modules(UNZIP REQUIRED minizip)
+endif()
 	pkg_check_modules(GTK REQUIRED gtk+-${GTK_TARGET}.0)
 
 	include_directories(${GTK_INCLUDE_DIRS})
