@@ -57,6 +57,7 @@ static char *packet = NULL;
 static const char* rcon_password = NULL;
 static char* rcon_challenge = NULL;         // halflife challenge
 static enum server_type rcon_servertype;
+static size_t rcon_last_msg_size = 0;
 
 #if defined(BUILD_XQF)
 static struct history *rcon_history = NULL;
@@ -427,6 +428,7 @@ static char* rcon_receive() {
 		}
 
 		msg = msg_terminate (msg, size);
+		rcon_last_msg_size = strlen(msg);
 	}
 
 	return msg;
@@ -441,7 +443,7 @@ static gboolean rcon_input_callback (GIOChannel *chan, GIOCondition condition,
 
 	while (wait_read_timeout(rcon_fd, 0, 50000) > 0) {
 		msg = rcon_receive();
-		gtk_text_buffer_insert_at_cursor (rcon_text_buffer, msg, strlen(msg));
+		gtk_text_buffer_insert_at_cursor (rcon_text_buffer, msg, rcon_last_msg_size);
 		g_free(msg);
 	}
 
