@@ -214,12 +214,25 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
                               </object>
                             </child>
                             <child>
+                              <object class="GtkSeparator" id="player-skin-handle">
+                                <property name="visible">False</property>
+                                <property name="height-request">6</property>
+                              </object>
+                            </child>
+                            <child>
                               <object class="GtkFrame" id="player-skin-frame">
                                 <property name="visible">False</property>
                                 <property name="halign">center</property>
                                 <child>
-                                  <object class="GtkImage" id="player-skin-image">
+                                  <object class="GtkPicture" id="player-skin-image">
                                     <property name="visible">True</property>
+                                    <property name="can-shrink">True</property>
+                                    <property name="content-fit">scale-down</property>
+                                    <property name="halign">center</property>
+                                    <property name="valign">center</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                    <property name="width-request">220</property>
                                     <property name="height-request">120</property>
                                   </object>
                                 </child>
@@ -241,6 +254,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
                               </object>
                             </child>
                             <child>
+                              <object class="GtkSeparator" id="server-mapshot-handle">
+                                <property name="visible">False</property>
+                                <property name="height-request">6</property>
+                              </object>
+                            </child>
+                            <child>
                               <object class="GtkFrame" id="server-mapshot-frame">
                                 <property name="visible">False</property>
                                 <property name="halign">center</property>
@@ -248,7 +267,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
                                   <object class="GtkPicture" id="server-mapshot-picture">
                                     <property name="visible">True</property>
                                     <property name="can-shrink">True</property>
-                                    <property name="content-fit">contain</property>
+                                    <property name="content-fit">scale-down</property>
+                                    <property name="halign">center</property>
+                                    <property name="valign">center</property>
+                                    <property name="hexpand">False</property>
+                                    <property name="vexpand">False</property>
+                                    <property name="width-request">220</property>
                                     <property name="height-request">120</property>
                                   </object>
                                 </child>

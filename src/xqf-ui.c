@@ -88,33 +88,28 @@ static struct list_column server_columns[] =
 {
 	{
 		.name =      N_("Name"),
-		.width =     180,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_SERVER_NAME, SORT_SERVER_TYPE, -1 },
 		.sort_name = { NULL, N_("Type") },
 	},
 	{
 		.name =      N_("Address"),
-		.width =     140,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_SERVER_ADDRESS, SORT_SERVER_COUNTRY, -1 },
 		.sort_name = { NULL, N_("Country") },
 	},
 	{
 		.name =      N_("Ping"),
-		.width =     45,
 		.justify =   GTK_JUSTIFY_RIGHT,
 		.sort_mode = { SORT_SERVER_PING, -1 }
 	},
 	{
 		.name =      N_("TO"),
-		.width =     35,
 		.justify =   GTK_JUSTIFY_RIGHT,
 		.sort_mode = { SORT_SERVER_TO, -1 }
 	},
 	{
 		.name =      N_("Priv"),
-		.width =     35,
 		.justify =   GTK_JUSTIFY_RIGHT,
 		.sort_mode = { SORT_SERVER_PRIVATE, SORT_SERVER_ANTICHEAT, -1 },
 		// .Translator = "PunkBuster"
@@ -122,7 +117,6 @@ static struct list_column server_columns[] =
 	},
 	{
 		.name =      N_("Players"),
-		.width =     65,
 		.justify =   GTK_JUSTIFY_RIGHT,
 		.sort_mode = { SORT_SERVER_PLAYERS, SORT_SERVER_MAXPLAYERS, -1 },
 		// .Translator = Max as in max players
@@ -130,19 +124,16 @@ static struct list_column server_columns[] =
 	},
 	{
 		.name =      N_("Map"),
-		.width =     55,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_SERVER_MAP, -1 }
 	},
 	{
 		.name =      N_("Game"),
-		.width =     55,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_SERVER_GAME, -1 }
 	},
 	{
 		.name =      N_("GameType"),
-		.width =     55,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_SERVER_GAMETYPE, -1 }
 	},
@@ -163,37 +154,31 @@ static struct list_column player_columns[] =
 {
 	{
 		.name =      N_("Name"),
-		.width =     100,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_PLAYER_NAME, -1 },
 	},
 	{
 		.name =      N_("Frags"),
-		.width =     50,
 		.justify =   GTK_JUSTIFY_RIGHT,
 		.sort_mode = { SORT_PLAYER_FRAGS, -1 },
 	},
 	{
 		.name =      N_("Colors"),
-		.width =     60,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_PLAYER_COLOR, -1 },
 	},
 	{
 		.name =      N_("Skin"),
-		.width =     50,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_PLAYER_SKIN, -1 },
 	},
 	{
 		.name =      N_("Ping"),
-		.width =     45,
 		.justify =   GTK_JUSTIFY_RIGHT,
 		.sort_mode = { SORT_PLAYER_PING, -1 },
 	},
 	{
 		.name =      N_("Time"),
-		.width =     45,
 		.justify =   GTK_JUSTIFY_LEFT,
 		.sort_mode = { SORT_PLAYER_TIME, -1 },
 	}
@@ -655,7 +640,17 @@ void restore_main_window_geometry (void) {
 
 	gtk_paned_set_position (GTK_PANED (pane1_widget), (pane1)? pane1 : 260);
 	gtk_paned_set_position (GTK_PANED (pane2_widget), (pane2)? pane2 : server_list_def.height +4);
-	gtk_paned_set_position (GTK_PANED (pane3_widget), (pane3)? pane3 : player_list_def.height + 4);
+
+	if (pane3) {
+		gtk_paned_set_position (GTK_PANED (pane3_widget), pane3);
+	} else {
+		/* Measure player_view directly rather than scrollwin-player: its
+		 * GtkScrolledWindow doesn't propagate natural width outward. */
+		int min_w = 0, nat_w = 0;
+		gtk_widget_measure (player_view, GTK_ORIENTATION_HORIZONTAL, -1,
+		                     &min_w, &nat_w, NULL, NULL);
+		gtk_paned_set_position (GTK_PANED (pane3_widget), nat_w > 0 ? nat_w : player_list_def.width + 4);
+	}
 }
 
 

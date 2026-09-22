@@ -27,7 +27,6 @@
 
 struct list_column {
 	const char *name;
-	int width;
 	GtkJustification justify;
 	GtkWidget *widget;
 	const char* const sort_name[3];

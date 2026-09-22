@@ -272,7 +272,13 @@ void draw_qw_skin (GtkWidget *image, guchar *data, int top, int bottom) {
 
 	{
 		GdkTexture *tex = gdk_texture_new_for_pixbuf (pixbuf);
-		gtk_image_set_from_paintable (GTK_IMAGE (image), GDK_PAINTABLE (tex));
+		/* The panel-row preview uses a GtkPicture (for content-fit scaling
+		 * within the resizable row); the preferences dialog previews still
+		 * use a fixed-size GtkImage. */
+		if (GTK_IS_PICTURE (image))
+			gtk_picture_set_paintable (GTK_PICTURE (image), GDK_PAINTABLE (tex));
+		else
+			gtk_image_set_from_paintable (GTK_IMAGE (image), GDK_PAINTABLE (tex));
 		g_object_unref (tex);
 	}
 

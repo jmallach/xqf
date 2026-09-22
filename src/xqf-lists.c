@@ -49,11 +49,17 @@ on_server_selection_changed (GtkSelectionModel *model G_GNUC_UNUSED,
 static void
 server_col_setup (GtkSignalListItemFactory *f G_GNUC_UNUSED,
                   GtkListItem *item,
-                  gpointer col G_GNUC_UNUSED)
+                  gpointer user_data)
 {
     GtkWidget *label = gtk_label_new (NULL);
     gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
     gtk_widget_set_margin_start (label, 2);
+    if (GPOINTER_TO_INT (user_data) == 0) {
+        /* Server name is free text; cap width and ellipsize instead of
+         * letting a long one balloon the column. */
+        gtk_label_set_max_width_chars (GTK_LABEL (label), 40);
+        gtk_label_set_ellipsize (GTK_LABEL (label), PANGO_ELLIPSIZE_END);
+    }
     gtk_list_item_set_child (item, label);
 }
 
@@ -240,11 +246,14 @@ player_col_setup (GtkSignalListItemFactory *f G_GNUC_UNUSED,
     int col = GPOINTER_TO_INT (user_data);
 
     if (col == 0) {
-        /* Name column: optional group-color icon + label */
+        /* Name column: optional group-color icon + label. Cap width and
+         * ellipsize -- see server_col_setup(). */
         GtkWidget *box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 2);
         GtkWidget *image = gtk_image_new ();
         GtkWidget *label = gtk_label_new (NULL);
         gtk_label_set_xalign (GTK_LABEL (label), 0.0f);
+        gtk_label_set_max_width_chars (GTK_LABEL (label), 20);
+        gtk_label_set_ellipsize (GTK_LABEL (label), PANGO_ELLIPSIZE_END);
         gtk_widget_set_margin_start (box, 2);
         gtk_box_append (GTK_BOX (box), image);
         gtk_box_append (GTK_BOX (box), label);
@@ -387,14 +396,25 @@ create_server_column_view (GtkWidget *scrollwin)
 
         GtkColumnViewColumn *col =
             gtk_column_view_column_new (_(server_list_def.cols[i].name), factory);
-        gtk_column_view_column_set_resizable (col, TRUE);
-        if (i == server_list_def.columns - 1)
+        if (i == server_list_def.columns - 1) {
+            /* Expand column always reclaims leftover space, so a resize
+             * handle on it would be a dead control. */
+            gtk_column_view_column_set_resizable (col, FALSE);
             gtk_column_view_column_set_expand (col, TRUE);
+        }
         else {
-            char width_key[256];
-            g_snprintf (width_key, sizeof (width_key), "%s=%d",
-                        server_list_def.cols[i].name, server_list_def.cols[i].width);
-            gtk_column_view_column_set_fixed_width (col, config_get_int (width_key));
+            gtk_column_view_column_set_resizable (col, TRUE);
+            /* Only pin a width if the user resized this column before;
+             * otherwise auto-size to header text (locale-independent).
+             * Name is the exception: its content is an arbitrary server
+             * name, not translated text, so give it a fixed floor instead
+             * -- ellipsize (above) handles anything longer. */
+            int used_default = FALSE;
+            int width = config_get_int_with_default (server_list_def.cols[i].name, &used_default);
+            if (!used_default)
+                gtk_column_view_column_set_fixed_width (col, width);
+            else if (i == 0)
+                gtk_column_view_column_set_fixed_width (col, 180);
         }
 
         GtkSorter *sorter = GTK_SORTER (
@@ -473,14 +493,19 @@ create_player_column_view (GtkWidget *scrollwin)
 
         GtkColumnViewColumn *col =
             gtk_column_view_column_new (_(player_list_def.cols[i].name), factory);
-        gtk_column_view_column_set_resizable (col, TRUE);
-        if (i == player_list_def.columns - 1)
+        if (i == player_list_def.columns - 1) {
+            gtk_column_view_column_set_resizable (col, FALSE);
             gtk_column_view_column_set_expand (col, TRUE);
+        }
         else {
-            char width_key[256];
-            g_snprintf (width_key, sizeof (width_key), "%s=%d",
-                        player_list_def.cols[i].name, player_list_def.cols[i].width);
-            gtk_column_view_column_set_fixed_width (col, config_get_int (width_key));
+            gtk_column_view_column_set_resizable (col, TRUE);
+            /* See create_server_column_view() for the width logic. */
+            int used_default = FALSE;
+            int width = config_get_int_with_default (player_list_def.cols[i].name, &used_default);
+            if (!used_default)
+                gtk_column_view_column_set_fixed_width (col, width);
+            else if (i == 0)
+                gtk_column_view_column_set_fixed_width (col, 140);
         }
 
         GtkSorter *sorter = GTK_SORTER (

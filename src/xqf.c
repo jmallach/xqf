@@ -1745,6 +1745,118 @@ void add_to_player_filter (unsigned mask) {
 }
 
 
+/* Draggable resize handle for the levelshot/skin preview rows. Not a
+ * GtkPaned: a 4th level of alternating-orientation GtkPaned nesting hits a
+ * GTK4 bug that collapses everything below it to zero height
+ * (https://gitlab.gnome.org/GNOME/gtk/-/work_items/8425). A GtkSeparator
+ * plus GtkGestureDrag sidesteps that. */
+
+/* Coalesces to one relayout per frame and skips sub-3px changes, since
+ * set_size_request() forces a full ancestor-tree relayout each time. */
+static gboolean resize_handle_tick (GtkWidget *picture, GdkFrameClock *frame_clock, gpointer gesture) {
+	(void) frame_clock;
+	int pending = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "pending-height"));
+	int committed = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "committed-height"));
+	if (abs (pending - committed) >= 3) {
+		int width = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "start-width"));
+		gtk_widget_set_size_request (picture, width, pending);
+		g_object_set_data (G_OBJECT (gesture), "committed-height", GINT_TO_POINTER (pending));
+	}
+	return G_SOURCE_CONTINUE;
+}
+
+/* The gesture is attached to the containing box, not the handle (see
+ * setup_resize_handle()): the handle moves as a side effect of the resize,
+ * and GtkGestureDrag's offset is relative to its own widget, so a moving
+ * handle fed its own displacement back in as extra "mouse movement" -- a
+ * feedback loop seen as flicker/oscillation. Hit-test against the handle's
+ * bounds so only an on-handle press engages the drag. */
+static void resize_handle_drag_begin (GtkGestureDrag *gesture, double start_x, double start_y, gpointer user_data) {
+	GtkWidget **widgets = user_data; /* { handle, picture } */
+	GtkWidget *handle = widgets[0];
+	GtkWidget *picture = widgets[1];
+
+	graphene_rect_t bounds;
+	gboolean on_handle = gtk_widget_get_visible (handle) &&
+	                      gtk_widget_compute_bounds (handle, gtk_widget_get_parent (handle), &bounds) &&
+	                      graphene_rect_contains_point (&bounds, &(graphene_point_t) { start_x, start_y });
+	g_object_set_data (G_OBJECT (gesture), "active", GINT_TO_POINTER (on_handle));
+	if (!on_handle)
+		return;
+
+	int start_height = gtk_widget_get_height (GTK_WIDGET (picture));
+	int start_width = gtk_widget_get_width (GTK_WIDGET (picture));
+	g_object_set_data (G_OBJECT (gesture), "start-height", GINT_TO_POINTER (start_height));
+	g_object_set_data (G_OBJECT (gesture), "start-width", GINT_TO_POINTER (start_width));
+	g_object_set_data (G_OBJECT (gesture), "pending-height", GINT_TO_POINTER (start_height));
+	g_object_set_data (G_OBJECT (gesture), "committed-height", GINT_TO_POINTER (start_height));
+
+	guint tick_id = gtk_widget_add_tick_callback (GTK_WIDGET (picture), resize_handle_tick, gesture, NULL);
+	g_object_set_data (G_OBJECT (gesture), "tick-id", GUINT_TO_POINTER (tick_id));
+}
+
+static void resize_handle_drag_update (GtkGestureDrag *gesture, double offset_x, double offset_y, gpointer user_data) {
+	(void) offset_x; (void) user_data;
+	if (!GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "active")))
+		return;
+	int start_height = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "start-height"));
+	/* Dragging up (offset_y negative) grows the picture below the handle. */
+	int new_height = CLAMP (start_height - (int) offset_y, 60, 600);
+	g_object_set_data (G_OBJECT (gesture), "pending-height", GINT_TO_POINTER (new_height));
+}
+
+static void resize_handle_drag_end (GtkGestureDrag *gesture, double offset_x, double offset_y, gpointer user_data) {
+	(void) offset_x; (void) offset_y;
+	if (!GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "active")))
+		return;
+	GtkWidget **widgets = user_data;
+	GtkWidget *picture = widgets[1];
+
+	guint tick_id = GPOINTER_TO_UINT (g_object_get_data (G_OBJECT (gesture), "tick-id"));
+	if (tick_id)
+		gtk_widget_remove_tick_callback (GTK_WIDGET (picture), tick_id);
+
+	int pending = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "pending-height"));
+	int width = GPOINTER_TO_INT (g_object_get_data (G_OBJECT (gesture), "start-width"));
+	gtk_widget_set_size_request (GTK_WIDGET (picture), width, pending);
+
+	const char *config_key = g_object_get_data (G_OBJECT (picture), "resize-config-key");
+	if (config_key) {
+		char path[128];
+		g_snprintf (path, sizeof (path), "/" CONFIG_FILE "/Main Window Geometry/%s", config_key);
+		config_set_int (path, pending);
+	}
+}
+
+/* Restores the saved height, binds handle visibility to frame visibility,
+ * and wires up the drag gesture on the containing box. */
+static void setup_resize_handle (GtkWidget *box, GtkWidget *handle, GtkWidget *frame, GtkWidget *picture, const char *config_key, int default_width, int default_height) {
+	char path[128];
+	g_snprintf (path, sizeof (path), "/" CONFIG_FILE "/Main Window Geometry/%s", config_key);
+	int saved_height = config_get_int (path);
+	int height_to_set = saved_height ? saved_height : default_height;
+	gtk_widget_set_size_request (picture, default_width, height_to_set);
+
+	g_object_set_data (G_OBJECT (picture), "resize-config-key", (gpointer) config_key);
+	g_object_bind_property (frame, "visible", handle, "visible", G_BINDING_SYNC_CREATE);
+
+	GtkWidget **widgets = g_new (GtkWidget *, 2);
+	widgets[0] = handle;
+	widgets[1] = picture;
+
+	GtkGesture *drag = gtk_gesture_drag_new ();
+	g_signal_connect (drag, "drag-begin", G_CALLBACK (resize_handle_drag_begin), widgets);
+	g_signal_connect (drag, "drag-update", G_CALLBACK (resize_handle_drag_update), widgets);
+	g_signal_connect (drag, "drag-end", G_CALLBACK (resize_handle_drag_end), widgets);
+	g_object_weak_ref (G_OBJECT (drag), (GWeakNotify) g_free, widgets);
+	gtk_widget_add_controller (box, GTK_EVENT_CONTROLLER (drag));
+
+	GdkCursor *cursor = gdk_cursor_new_from_name ("ns-resize", NULL);
+	gtk_widget_set_cursor (handle, cursor);
+	g_object_unref (cursor);
+}
+
+
 static GtkWidget *player_skin_frame = NULL;
 static GtkWidget *player_skin_image = NULL;
 
@@ -2143,13 +2255,23 @@ void populate_main_window (void) {
 	player_skin_image = GTK_WIDGET (gtk_builder_get_object (builder, "player-skin-image"));
 	g_signal_connect (player_selection, "selection-changed",
 			G_CALLBACK (player_selection_changed_cb), NULL);
+	setup_resize_handle (GTK_WIDGET (gtk_builder_get_object (builder, "player-info-box")),
+	                     GTK_WIDGET (gtk_builder_get_object (builder, "player-skin-handle")),
+	                     player_skin_frame, player_skin_image, "player skin height", 220, 120);
 
 	// Server Info TreeView
 
-	srvinf_treeview = srvinf_treeview_new (
-		GTK_WIDGET (gtk_builder_get_object (builder, "scrollwin-server-info")),
-		GTK_WIDGET (gtk_builder_get_object (builder, "server-mapshot-frame")),
-		GTK_WIDGET (gtk_builder_get_object (builder, "server-mapshot-picture")));
+	{
+		GtkWidget *mapshot_frame = GTK_WIDGET (gtk_builder_get_object (builder, "server-mapshot-frame"));
+		GtkWidget *mapshot_picture = GTK_WIDGET (gtk_builder_get_object (builder, "server-mapshot-picture"));
+		srvinf_treeview = srvinf_treeview_new (
+			GTK_WIDGET (gtk_builder_get_object (builder, "scrollwin-server-info")),
+			mapshot_frame,
+			mapshot_picture);
+		setup_resize_handle (GTK_WIDGET (gtk_builder_get_object (builder, "server-info-box")),
+		                     GTK_WIDGET (gtk_builder_get_object (builder, "server-mapshot-handle")),
+		                     mapshot_frame, mapshot_picture, "server mapshot height", 220, 120);
+	}
 	gtk_widget_set_visible (srvinf_treeview, TRUE);
 
 	(void) calculate_row_height (GTK_WIDGET (server_view), games[Q1_SERVER].pix);
